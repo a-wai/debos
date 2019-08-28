@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"io/ioutil"
 
 	"github.com/go-debos/debos"
 )
@@ -51,6 +52,7 @@ type PacstrapAction struct {
 	debos.BaseAction `yaml:",inline"`
 	Mirror           string
 	MirrorLayout     string `yaml:"mirror-layout"`
+	ConfigTemplate	 string `yaml:"config-template"`
 }
 
 func NewPacstrapAction() *PacstrapAction {
@@ -66,13 +68,25 @@ func NewPacstrapAction() *PacstrapAction {
 func (d *PacstrapAction) Run(context *debos.DebosContext) error {
 	d.LogStart()
 
+	configString := pacmanConfig
+
+	if len(d.ConfigTemplate) > 0 {
+		templatePath := path.Join(context.RecipeDir, d.ConfigTemplate)
+		template, err := ioutil.ReadFile(templatePath)
+		if err != nil {
+			fmt.Errorf("Couldn't open template pacman config: %v", err)
+		} else {
+			configString = string(template)
+		}
+	}
+
 	// Create config for pacstrap
 	configPath := path.Join(context.Scratchdir, "pacman.conf")
 	f, err := os.OpenFile(configPath, os.O_RDWR|os.O_CREATE, 0644)
         if err != nil {
                 return fmt.Errorf("Couldn't open pacman config: %v", err)
         }
-	_, err = f.WriteString(fmt.Sprintf(pacmanConfig, context.Rootdir, d.Mirror, d.MirrorLayout))
+	_, err = f.WriteString(fmt.Sprintf(configString, context.Rootdir, d.Mirror, d.MirrorLayout))
         if err != nil {
                 return fmt.Errorf("Couldn't write pacman config: %v", err)
         }
